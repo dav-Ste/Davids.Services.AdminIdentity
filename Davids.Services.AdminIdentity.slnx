@@ -1,0 +1,27 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+    <File Path="LICENSE" />
+    <File Path=".gitignore" />
+    <File Path=".dockerignore" />
+    <File Path="Dockerfile" />
+    <File Path="Dockerfile.dockerignore" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path=".github/workflows/codeql.yml" />
+    <File Path=".github/workflows/pull-request-ci.yml" />
+  </Folder>
+  <Folder Name="/Admin-Identity/">
+    <Project Path="src/Davids.Services.AdminIdentity.Core/Davids.Services.AdminIdentity.Core.csproj" />
+    <Project Path="src/Davids.Services.AdminIdentity.Application/Davids.Services.AdminIdentity.Application.csproj" />
+    <Project Path="src/Davids.Services.AdminIdentity.Infrastructure/Davids.Services.AdminIdentity.Infrastructure.csproj" />
+    <Project Path="src/Davids.Services.AdminIdentity.Api/Davids.Services.AdminIdentity.Api.csproj" />
+  </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="../Davids.Shared/src/Davids.ServiceDefaults/Davids.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="tests/Davids.Services.AdminIdentity.Tests/Davids.Services.AdminIdentity.Tests.csproj" />
+  </Folder>
+</Solution>

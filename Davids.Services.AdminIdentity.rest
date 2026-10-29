@@ -1,0 +1,53 @@
+# Replace port with api-gateway's HTTP endpoint shown in Aspire.
+@gateway = http://localhost:17320
+@adminIdentity = {{gateway}}/admin-identity
+@adminAccessToken = paste-admin-rs256-access-token-here
+@adminRefreshToken = paste-admin-refresh-token-here
+@bffClientSecret = paste-admin-oidc-bff-client-secret-here
+
+### Admin OIDC Discovery & Public RSA JWKS
+GET {{adminIdentity}}/.well-known/openid-configuration
+
+###
+GET {{adminIdentity}}/.well-known/jwks
+
+### Exchange Authorization Code + PKCE (confidential BFF client davids-admin-bff)
+POST {{adminIdentity}}/connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code&client_id=davids-admin-bff&client_secret={{bffClientSecret}}&code=paste-auth-code&redirect_uri={{gateway}}%2Fsignin-oidc&code_verifier=paste-pkce-verifier
+
+### Rotate single-use administrator refresh token
+POST {{adminIdentity}}/connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=refresh_token&client_id=davids-admin-bff&client_secret={{bffClientSecret}}&refresh_token={{adminRefreshToken}}
+
+### Current administrator profile (/me and OIDC /connect/userinfo)
+GET {{adminIdentity}}/me
+Authorization: Bearer {{adminAccessToken}}
+
+###
+GET {{adminIdentity}}/connect/userinfo
+Authorization: Bearer {{adminAccessToken}}
+
+### List administrator accounts (stored in adminidentitydb)
+GET {{adminIdentity}}/users
+Authorization: Bearer {{adminAccessToken}}
+
+### Provision a new administrator account (admin-only; no public sign-up exists)
+POST {{adminIdentity}}/users
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "email": "ops.admin@davids.local",
+  "password": "Strong-Admin-Password-123!",
+  "fullName": "Operations Administrator"
+}
+
+### RFC 7009 Administrator Token Revocation
+POST {{adminIdentity}}/connect/revocation
+Content-Type: application/x-www-form-urlencoded
+
+client_id=davids-admin-bff&client_secret={{bffClientSecret}}&token={{adminAccessToken}}&token_type_hint=access_token

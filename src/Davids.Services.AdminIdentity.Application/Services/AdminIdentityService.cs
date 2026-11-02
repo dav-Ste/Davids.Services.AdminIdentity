@@ -80,7 +80,7 @@ public sealed class AdminIdentityService(
         string normalizedEmail;
         try
         {
-            normalizedEmail = AdminUser.NormalizeAndValidateEmail(email);
+            normalizedEmail = AdminUser.NormalizeAndValidateEmail(email.Trim());
         }
         catch (InvalidAdminEmailException)
         {
@@ -231,9 +231,10 @@ public sealed class AdminIdentityService(
         ArgumentNullException.ThrowIfNull(command);
 
         var normalizedEmail = AdminUser.NormalizeAndValidateEmail(command.Email);
+        var passwordRuneCount = command.Password?.EnumerateRunes().Count() ?? 0;
         if (string.IsNullOrWhiteSpace(command.Password) ||
-            command.Password.Length < 12 ||
-            command.Password.Length > 128 ||
+            passwordRuneCount < 12 ||
+            passwordRuneCount > 128 ||
             command.Password.Contains('\0'))
         {
             throw new InvalidAdminPasswordException();

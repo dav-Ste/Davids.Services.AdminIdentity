@@ -54,7 +54,7 @@ public static class AdminOpenApiExtensions
                     if (createSchema.Properties.TryGetValue("fullName", out var nameProp) && nameProp is OpenApiSchema nameSchema)
                     {
                         nameSchema.Type = JsonSchemaType.String | JsonSchemaType.Null;
-                        nameSchema.MaxLength = 200;
+                        nameSchema.MaxLength = 100;
                         nameSchema.Pattern = @"^[^\u0000]*$";
                     }
                 }

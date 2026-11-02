@@ -39,13 +39,13 @@ public sealed class AdminUser
             throw new InvalidAdminPasswordException();
         }
 
-        if (fullName is not null && (fullName.Length > 200 || fullName.Contains('\0')))
+        if (fullName is not null && (fullName.EnumerateRunes().Count() > 100 || fullName.Contains('\0')))
         {
             throw new InvalidAdminFullNameException();
         }
 
         var trimmedName = fullName?.Trim() ?? string.Empty;
-        if (trimmedName.Length > 200 || trimmedName.Contains('\0'))
+        if (trimmedName.EnumerateRunes().Count() > 100 || trimmedName.Contains('\0'))
         {
             throw new InvalidAdminFullNameException();
         }
@@ -100,9 +100,14 @@ public sealed class AdminUser
             throw new InvalidAdminEmailException(email);
         }
 
-        var normalized = email.Trim().ToLowerInvariant();
+        if (!string.Equals(email, email.Trim(), StringComparison.Ordinal))
+        {
+            throw new InvalidAdminEmailException(email);
+        }
+
+        var normalized = email.ToLowerInvariant();
         var atIndex = normalized.IndexOf('@');
-        if (email.Length < 6 || email.Length > 254 || normalized.Length < 6 || normalized.Length > 254 ||
+        if (normalized.Length < 6 || normalized.Length > 254 ||
             atIndex < 1 || atIndex > 64 || normalized.Contains('\0'))
         {
             throw new InvalidAdminEmailException(email);

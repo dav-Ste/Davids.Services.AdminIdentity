@@ -17,10 +17,34 @@ public sealed class InvalidAdminPasswordException()
     public override string Code => "invalid_admin_password";
 }
 
+public sealed class InvalidCurrentPasswordException()
+    : AdminDomainException("The current password is incorrect.")
+{
+    public override string Code => "invalid_current_password";
+}
+
 public sealed class InvalidAdminFullNameException()
     : AdminDomainException("Administrator full name must be 200 characters or fewer.")
 {
     public override string Code => "invalid_admin_full_name";
+}
+
+public sealed class InvalidAdminRoleException(string? role)
+    : AdminDomainException($"Invalid employee role '{role}'. Allowed roles: admin, support, auditor.")
+{
+    public override string Code => "invalid_admin_role";
+}
+
+public sealed class AdminNotFoundException(Guid adminId)
+    : AdminDomainException($"Employee account '{adminId}' was not found.")
+{
+    public override string Code => "admin_not_found";
+}
+
+public sealed class LastActiveAdminException()
+    : AdminDomainException("Cannot deactivate or demote the last active administrator account.")
+{
+    public override string Code => "last_active_admin";
 }
 
 public sealed class InvalidAdminCredentialsException()

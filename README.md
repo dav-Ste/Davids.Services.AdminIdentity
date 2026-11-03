@@ -36,10 +36,14 @@ Requests are routed through [`Davids.APIGateway`](https://github.com/dav-Ste/Dav
 | `GET` / `POST` | `/connect/userinfo` | `AdminBearer` (`admin`) | Standard OIDC UserInfo endpoint for verified administrators |
 | `POST` | `/connect/revocation` | Confidential client | RFC 7009 revocation; revokes grants and syncs access-token `jti` to SQL + Redis `davids:admin-identity:revoked:<jti>` |
 | `GET` / `POST` | `/connect/logout` | Anonymous | OIDC End-Session logout endpoint |
-| `GET` | `/me` | `AdminBearer` (`admin`) | Returns authenticated administrator identity claims |
-| `GET` | `/users` | `AdminBearer` (`admin`) | Lists administrator accounts in `adminidentitydb` |
-| `POST` | `/users` | `AdminBearer` (`admin`) | Provisions a new `admin` account in `adminidentitydb` |
-| `GET` | `/login-audits` | `AdminBearer` (`admin`) | Returns append-only zero-secret administrator login audit logs (`AdminLoginAuditLogs`) |
+| `GET` | `/me` | `AdminBearer` (`admin`/`support`/`auditor`) | Returns authenticated workforce employee claims |
+| `PUT` | `/me/password` | `AdminBearer` (`admin`/`support`/`auditor`) | Verifies `currentPassword`, rotates password hash, revokes active OpenIddict grants + `jti`, and appends `AdminChangeAuditLogs` |
+| `GET` | `/users` | `AdminBearer` (`admin`/`support`/`auditor`) | Lists workforce accounts (`admin`, `support`, `auditor`) in `adminidentitydb` |
+| `POST` | `/users` | `AdminBearer` (`admin`) | Provisions a workforce account (`admin`, `support`, or `auditor`) and records `AdminChangeAuditLogs` |
+| `PUT` | `/users/{userId}` | `AdminBearer` (`admin`) | Updates workforce role/name/active status with last-active-admin lockout protection |
+| `POST` | `/users/{userId}/unlock` | `AdminBearer` (`admin`) | Clears workforce account lockout and failed-attempt counters |
+| `GET` | `/login-audits` | `AdminBearer` (`admin`/`support`/`auditor`) | Returns append-only zero-secret workforce login audit logs (`AdminLoginAuditLogs`) |
+| `GET` | `/change-audits` | `AdminBearer` (`admin`/`support`/`auditor`) | Returns append-only zero-secret workforce IAM change audit logs (`AdminChangeAuditLogs`) |
 | `GET` | `/health`, `/alive` | Probe | Readiness and liveness endpoints wired via `Davids.ServiceDefaults` |
 
 ## Build, test & container image
@@ -65,4 +69,5 @@ docker build -f Davids.Services.AdminIdentity/Dockerfile -t davids-admin-identit
 - [`Davids.APIGateway`](https://github.com/dav-Ste/Davids.APIGateway) — YARP `2.3.0` edge reverse proxy & confidential Admin OIDC BFF
 - [`Davids.Services.Identity`](https://github.com/dav-Ste/Davids.Services.Identity) — Customer OpenIddict `RS256` OIDC Provider (`identitydb`)
 - [`Davids.Services.Customers`](https://github.com/dav-Ste/Davids.Services.Customers) — Customer profiles & order tracking API (`customersdb`)
-- [`Davids.Frontend.Admin`](https://github.com/dav-Ste/Davids.Frontend.Admin) — Passwordless Admin customer search & editing web UI
+- [`Davids.Frontend.Admin`](https://github.com/dav-Ste/Davids.Frontend.Admin) — Passwordless Workforce RBAC customer, IAM & audit web UI
+- [`Davids.Frontend.Web`](https://github.com/dav-Ste/Davids.Frontend.Web) — Customer Self-Service Web Portal (`CustomerBffCookie` PKCE `S256` BFF)

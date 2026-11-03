@@ -231,7 +231,7 @@ public static class AdminOidcEndpoints
                 }
 
                 var admin = await adminIdentityService.GetAsync(adminId, cancellationToken);
-                if (admin is null || !admin.IsActive || !string.Equals(admin.Role, AdminUser.AdminRole, StringComparison.Ordinal))
+                if (admin is null || !admin.IsActive || !AdminUser.IsValidWorkforceRole(admin.Role))
                 {
                     context.Items[AdminOidcTokenErrorAuditHandler.AuditRecordedItemKey] = true;
                     await adminIdentityService.RecordProtocolFailureAuditAsync(
@@ -310,7 +310,7 @@ public static class AdminOidcEndpoints
         })
         .Produces<Dictionary<string, object>>(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status400BadRequest)
-        .RequireAuthorization("AdminOnly");
+        .RequireAuthorization("WorkforceAny");
 
         app.MapMethods("/connect/logout", ["GET", "POST"], () =>
             Results.SignOut(
@@ -332,7 +332,7 @@ public static class AdminOidcEndpoints
 
         identity.SetClaim(Claims.Subject, admin.Id.ToString("N"))
             .SetClaim(Claims.Email, admin.Email)
-            .SetClaim(Claims.Role, AdminUser.AdminRole)
+            .SetClaim(Claims.Role, admin.Role)
             .SetClaim(Claims.JwtId, Guid.NewGuid().ToString("N"));
 
         if (!string.IsNullOrWhiteSpace(admin.FullName))

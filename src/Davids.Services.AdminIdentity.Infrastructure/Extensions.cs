@@ -40,9 +40,11 @@ public static class AdminIdentityInfrastructureExtensions
 
         services.AddScoped<IAdminUserRepository, AdminUserRepository>();
         services.AddScoped<IAdminLoginAuditRepository, AdminLoginAuditRepository>();
+        services.AddScoped<IAdminChangeAuditRepository, AdminChangeAuditRepository>();
+        services.AddScoped<AdminRevocationStore>();
+        services.AddScoped<IAdminTokenRevocationService>(sp => sp.GetRequiredService<AdminRevocationStore>());
         services.AddScoped<IAdminIdentityService, AdminIdentityService>();
         services.AddSingleton<IAdminPasswordService, AdminPasswordService>();
-        services.AddScoped<AdminRevocationStore>();
 
         if (configuration.GetValue<bool>("Redis:Enabled"))
         {
@@ -97,7 +99,7 @@ public static class AdminIdentityInfrastructureExtensions
                 options.SetRefreshTokenLifetime(TimeSpan.FromHours(oidc.RefreshTokenLifetimeHours));
                 options.SetRefreshTokenReuseLeeway(TimeSpan.Zero);
 
-                // Downstream resource servers (APIGateway, Customers, Istio) verify RS256 signatures via public JWKS.
+                // Downstream resource servers (APIGateway, Customers, Identity, Istio) verify RS256 signatures via public JWKS.
                 options.DisableAccessTokenEncryption();
 
                 options.AddSigningKey(oidc.PrivateSigningKey);
@@ -136,9 +138,9 @@ public static class AdminIdentityInfrastructureExtensions
                     OnTokenValidated = async context =>
                     {
                         var role = context.Principal?.FindFirst(Claims.Role)?.Value;
-                        if (!string.Equals(role, AdminUser.AdminRole, StringComparison.Ordinal))
+                        if (!AdminUser.IsValidWorkforceRole(role))
                         {
-                            context.Fail("Admin Identity accepts 'admin' role tokens only.");
+                            context.Fail("Admin Identity accepts workforce role tokens (admin, support, auditor) only.");
                             return;
                         }
 
@@ -159,6 +161,16 @@ public static class AdminIdentityInfrastructureExtensions
             });
 
         services.AddAuthorizationBuilder()
+            .AddPolicy("WorkforceAny", policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(Claims.Role, AdminUser.AdminRole, AdminUser.SupportRole, AdminUser.AuditorRole);
+            })
+            .AddPolicy("WorkforceAuditRead", policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireClaim(Claims.Role, AdminUser.AdminRole, AdminUser.AuditorRole);
+            })
             .AddPolicy("AdminOnly", policy =>
             {
                 policy.RequireAuthenticatedUser();

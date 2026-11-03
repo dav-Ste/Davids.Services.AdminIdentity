@@ -135,8 +135,6 @@ if (!(app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("H
     app.UseHttpsRedirection();
 }
 
-// Gracefully absorb client-aborted requests (browser redirect/double-submit or health-check timeout)
-// inside user code so Visual Studio Just-My-Code never halts on User-Unhandled TaskCanceledException.
 app.Use(async (context, next) =>
 {
     try
@@ -175,11 +173,28 @@ if (app.Environment.IsDevelopment())
 }
 
 // NOTE: By security design, Davids.Services.AdminIdentity exposes NO public /sign-up endpoint.
-// Administrator authentication uses OAuth 2.1 Authorization Code + PKCE via OpenIddict (/connect/*).
+// Employee authentication uses OAuth 2.1 Authorization Code + PKCE via OpenIddict (/connect/*).
 app.MapGet("/", () => Results.Text("Davids Admin Identity OIDC Service"))
     .ExcludeFromDescription()
     .AllowAnonymous();
 app.MapAdminOidcEndpoints();
+
+static AdminActorMetadata? TryResolveActor(ClaimsPrincipal principal, HttpContext httpContext)
+{
+    if (!Guid.TryParse(principal.FindFirstValue("sub"), out var actorId))
+    {
+        return null;
+    }
+
+    var email = principal.FindFirstValue("email");
+    var role = principal.FindFirstValue("role") ?? AdminUser.AdminRole;
+    var jti = principal.FindFirstValue("jti");
+    DateTime? expUtc = long.TryParse(principal.FindFirstValue("exp"), out var expSeconds)
+        ? DateTimeOffset.FromUnixTimeSeconds(expSeconds).UtcDateTime
+        : null;
+    var correlationId = DavidsActorContext.ResolveCorrelationId(httpContext);
+    return new AdminActorMetadata(actorId, email, role, correlationId, jti, expUtc);
+}
 
 app.MapGet("/me", async (HttpContext httpContext, ClaimsPrincipal principal, IAdminIdentityService service, CancellationToken ct) =>
 {
@@ -200,7 +215,39 @@ app.MapGet("/me", async (HttpContext httpContext, ClaimsPrincipal principal, IAd
 })
 .Produces<AdminUserDto>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status404NotFound)
-.RequireAuthorization("AdminOnly");
+.RequireAuthorization("WorkforceAny");
+
+app.MapPut("/me/password", async (
+    HttpContext httpContext,
+    ChangeAdminPassword command,
+    ClaimsPrincipal principal,
+    IAdminIdentityService service,
+    CancellationToken ct) =>
+{
+    if (command is null)
+    {
+        return Results.BadRequest(new { code = "invalid_request", reason = "Request body is required." });
+    }
+
+    var actor = TryResolveActor(principal, httpContext);
+    if (actor is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        await service.ChangeMyPasswordAsync(actor.ActorAdminUserId, command, actor, ct);
+        return Results.NoContent();
+    }
+    catch (OperationCanceledException) when (httpContext.RequestAborted.IsCancellationRequested)
+    {
+        return Results.Empty;
+    }
+})
+.Produces(StatusCodes.Status204NoContent)
+.Produces(StatusCodes.Status400BadRequest)
+.RequireAuthorization("WorkforceAny");
 
 app.MapGet("/users", async (HttpContext httpContext, IAdminIdentityService service, CancellationToken ct) =>
 {
@@ -214,7 +261,7 @@ app.MapGet("/users", async (HttpContext httpContext, IAdminIdentityService servi
     }
 })
 .Produces<IReadOnlyList<AdminUserDto>>(StatusCodes.Status200OK)
-.RequireAuthorization("AdminOnly");
+.RequireAuthorization("WorkforceAuditRead");
 
 app.MapGet("/login-audits", async (
     HttpContext httpContext,
@@ -241,7 +288,34 @@ app.MapGet("/login-audits", async (
 })
 .Produces<IReadOnlyList<AdminLoginAuditDto>>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status400BadRequest)
-.RequireAuthorization("AdminOnly");
+.RequireAuthorization("WorkforceAuditRead");
+
+app.MapGet("/change-audits", async (
+    HttpContext httpContext,
+    int? limit,
+    Guid? targetUserId,
+    Guid? actorUserId,
+    IAdminIdentityService service,
+    CancellationToken ct) =>
+{
+    if (limit is < 1 or > 500)
+    {
+        return Results.BadRequest(new { code = "invalid_limit", reason = "Limit must be between 1 and 500." });
+    }
+
+    try
+    {
+        var entries = await service.BrowseChangeAuditsAsync(limit ?? 100, targetUserId, actorUserId, ct);
+        return Results.Ok(entries);
+    }
+    catch (OperationCanceledException) when (httpContext.RequestAborted.IsCancellationRequested)
+    {
+        return Results.Empty;
+    }
+})
+.Produces<IReadOnlyList<AdminChangeAuditDto>>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
+.RequireAuthorization("WorkforceAuditRead");
 
 app.MapPost("/users", async (
     HttpContext httpContext,
@@ -255,14 +329,15 @@ app.MapPost("/users", async (
         return Results.BadRequest(new { code = "invalid_request", reason = "Request body is required." });
     }
 
-    if (!Guid.TryParse(principal.FindFirstValue("sub"), out var actorId))
+    var actor = TryResolveActor(principal, httpContext);
+    if (actor is null)
     {
         return Results.Unauthorized();
     }
 
     try
     {
-        var created = await service.CreateAdminAsync(command, actorId, ct);
+        var created = await service.CreateAdminAsync(command, actor.ActorAdminUserId, ct, actor);
         return Results.Created($"/users/{created.Id}", created);
     }
     catch (OperationCanceledException) when (httpContext.RequestAborted.IsCancellationRequested)
@@ -273,6 +348,68 @@ app.MapPost("/users", async (
 .Produces<AdminUserDto>(StatusCodes.Status201Created)
 .Produces(StatusCodes.Status400BadRequest)
 .Produces(StatusCodes.Status409Conflict)
+.RequireAuthorization("AdminOnly");
+
+app.MapPut("/users/{userId:guid}", async (
+    Guid userId,
+    HttpContext httpContext,
+    UpdateAdminUser command,
+    ClaimsPrincipal principal,
+    IAdminIdentityService service,
+    CancellationToken ct) =>
+{
+    if (command is null)
+    {
+        return Results.BadRequest(new { code = "invalid_request", reason = "Request body is required." });
+    }
+
+    var actor = TryResolveActor(principal, httpContext);
+    if (actor is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        var updated = await service.UpdateEmployeeAsync(userId, command, actor, ct);
+        return Results.Ok(updated);
+    }
+    catch (OperationCanceledException) when (httpContext.RequestAborted.IsCancellationRequested)
+    {
+        return Results.Empty;
+    }
+})
+.Produces<AdminUserDto>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status409Conflict)
+.RequireAuthorization("AdminOnly");
+
+app.MapPost("/users/{userId:guid}/unlock", async (
+    Guid userId,
+    HttpContext httpContext,
+    ClaimsPrincipal principal,
+    IAdminIdentityService service,
+    CancellationToken ct) =>
+{
+    var actor = TryResolveActor(principal, httpContext);
+    if (actor is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    try
+    {
+        var unlocked = await service.UnlockEmployeeAsync(userId, actor, ct);
+        return Results.Ok(unlocked);
+    }
+    catch (OperationCanceledException) when (httpContext.RequestAborted.IsCancellationRequested)
+    {
+        return Results.Empty;
+    }
+})
+.Produces<AdminUserDto>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status404NotFound)
 .RequireAuthorization("AdminOnly");
 
 app.Run();

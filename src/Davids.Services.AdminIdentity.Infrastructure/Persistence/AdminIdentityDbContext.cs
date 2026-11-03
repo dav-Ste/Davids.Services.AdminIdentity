@@ -1,3 +1,4 @@
+using Davids.Services.AdminIdentity.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Davids.Services.AdminIdentity.Infrastructure.Persistence;
@@ -8,6 +9,7 @@ public sealed class AdminIdentityDbContext(DbContextOptions<AdminIdentityDbConte
     public DbSet<RevokedAdminAccessToken> RevokedAdminAccessTokens => Set<RevokedAdminAccessToken>();
     public DbSet<AdminDataProtectionKeyRow> DataProtectionKeys => Set<AdminDataProtectionKeyRow>();
     public DbSet<AdminLoginAuditLogRow> AdminLoginAuditLogs => Set<AdminLoginAuditLogRow>();
+    public DbSet<AdminChangeAuditLogRow> AdminChangeAuditLogs => Set<AdminChangeAuditLogRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,6 +24,7 @@ public sealed class AdminIdentityDbContext(DbContextOptions<AdminIdentityDbConte
             entity.HasIndex(x => x.Email).IsUnique();
             entity.Property(x => x.PasswordHash).IsRequired().HasMaxLength(512);
             entity.Property(x => x.FullName).HasMaxLength(200);
+            entity.Property(x => x.Role).IsRequired().HasMaxLength(32).HasDefaultValue(AdminUser.AdminRole);
             entity.Property(x => x.FailedLoginCount).HasDefaultValue(0);
         });
 
@@ -57,6 +60,21 @@ public sealed class AdminIdentityDbContext(DbContextOptions<AdminIdentityDbConte
             entity.HasIndex(x => new { x.Email, x.OccurredAtUtc });
             entity.HasIndex(x => new { x.AdminUserId, x.OccurredAtUtc });
         });
+
+        modelBuilder.Entity<AdminChangeAuditLogRow>(entity =>
+        {
+            entity.ToTable("AdminChangeAuditLogs");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.TargetEmail).IsRequired().HasMaxLength(320);
+            entity.Property(x => x.Action).IsRequired().HasMaxLength(64);
+            entity.Property(x => x.ActorEmail).HasMaxLength(320);
+            entity.Property(x => x.ActorRole).IsRequired().HasMaxLength(32);
+            entity.Property(x => x.ChangedFieldsJson).IsRequired();
+            entity.Property(x => x.CorrelationId).HasMaxLength(128);
+            entity.HasIndex(x => x.OccurredAtUtc);
+            entity.HasIndex(x => new { x.TargetAdminUserId, x.OccurredAtUtc });
+            entity.HasIndex(x => new { x.ActorAdminUserId, x.OccurredAtUtc });
+        });
     }
 }
 
@@ -66,6 +84,7 @@ public sealed class AdminUserRow
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public string? FullName { get; set; }
+    public string Role { get; set; } = AdminUser.AdminRole;
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
     public int FailedLoginCount { get; set; }
@@ -98,5 +117,19 @@ public sealed class AdminLoginAuditLogRow
     public string? ClientId { get; set; }
     public string? ClientIpAddress { get; set; }
     public string? UserAgent { get; set; }
+    public string? CorrelationId { get; set; }
+}
+
+public sealed class AdminChangeAuditLogRow
+{
+    public Guid Id { get; set; }
+    public DateTime OccurredAtUtc { get; set; }
+    public Guid TargetAdminUserId { get; set; }
+    public string TargetEmail { get; set; } = string.Empty;
+    public string Action { get; set; } = string.Empty;
+    public Guid ActorAdminUserId { get; set; }
+    public string? ActorEmail { get; set; }
+    public string ActorRole { get; set; } = AdminUser.AdminRole;
+    public string ChangedFieldsJson { get; set; } = "[]";
     public string? CorrelationId { get; set; }
 }

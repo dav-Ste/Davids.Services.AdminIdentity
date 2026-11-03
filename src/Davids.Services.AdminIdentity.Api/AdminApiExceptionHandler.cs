@@ -23,7 +23,9 @@ public sealed class AdminApiExceptionHandler(ILogger<AdminApiExceptionHandler> l
 
         var (status, code, reason) = exception switch
         {
+            AdminNotFoundException ex => (StatusCodes.Status404NotFound, ex.Code, ex.Message),
             AdminEmailInUseException ex => (StatusCodes.Status409Conflict, ex.Code, ex.Message),
+            LastActiveAdminException ex => (StatusCodes.Status409Conflict, ex.Code, ex.Message),
             AdminAccountDisabledException ex => (StatusCodes.Status403Forbidden, ex.Code, ex.Message),
             AdminAccountLockedException ex => (StatusCodes.Status429TooManyRequests, ex.Code, ex.Message),
             AdminDomainException ex => (StatusCodes.Status400BadRequest, ex.Code, ex.Message),

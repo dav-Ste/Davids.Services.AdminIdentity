@@ -1,3 +1,4 @@
+using Davids.Services.AdminIdentity.Application.Services;
 using Davids.Services.AdminIdentity.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -59,7 +60,8 @@ public sealed class RedisAdminRevocationCache(
 public sealed class AdminRevocationStore(
     AdminIdentityDbContext db,
     IAdminRevocationCache cache,
-    IOpenIddictTokenManager? tokenManager = null)
+    IOpenIddictTokenManager? tokenManager = null,
+    IOpenIddictAuthorizationManager? authorizationManager = null) : IAdminTokenRevocationService
 {
     public async Task<bool> IsRevokedAsync(
         string? tokenId,
@@ -114,5 +116,55 @@ public sealed class AdminRevocationStore(
         }
 
         return false;
+    }
+
+    public async Task RevokeAllForSubjectAsync(
+        Guid adminUserId,
+        string? currentAccessTokenJti = null,
+        DateTime? currentAccessTokenExpiresAtUtc = null,
+        CancellationToken cancellationToken = default)
+    {
+        var subjects = new[] { adminUserId.ToString("N"), adminUserId.ToString("D") };
+
+        if (tokenManager is not null)
+        {
+            foreach (var sub in subjects)
+            {
+                await foreach (var token in tokenManager.FindBySubjectAsync(sub, cancellationToken))
+                {
+                    await tokenManager.TryRevokeAsync(token, cancellationToken);
+                }
+            }
+        }
+
+        if (authorizationManager is not null)
+        {
+            foreach (var sub in subjects)
+            {
+                await foreach (var authorization in authorizationManager.FindBySubjectAsync(sub, cancellationToken))
+                {
+                    await authorizationManager.TryRevokeAsync(authorization, cancellationToken);
+                }
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(currentAccessTokenJti))
+        {
+            var expiresAt = currentAccessTokenExpiresAtUtc is { } exp && exp > DateTime.UtcNow
+                ? exp
+                : DateTime.UtcNow.AddMinutes(60);
+            if (!await db.RevokedAdminAccessTokens.AnyAsync(x => x.TokenId == currentAccessTokenJti, cancellationToken))
+            {
+                db.RevokedAdminAccessTokens.Add(new RevokedAdminAccessToken
+                {
+                    TokenId = currentAccessTokenJti,
+                    ExpiresAt = expiresAt
+                });
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            await cache.AddAsync(currentAccessTokenJti, expiresAt);
+            AdminIdentitySecurityMetrics.RecordTokenRevocation("credential_change");
+        }
     }
 }

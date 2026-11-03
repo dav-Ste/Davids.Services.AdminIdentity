@@ -6,12 +6,21 @@ namespace Davids.Services.AdminIdentity.Core.Entities;
 public sealed class AdminUser
 {
     public const string AdminRole = "admin";
+    public const string SupportRole = "support";
+    public const string AuditorRole = "auditor";
+
+    public static readonly IReadOnlyList<string> ValidRoles =
+    [
+        AdminRole,
+        SupportRole,
+        AuditorRole
+    ];
 
     public Guid Id { get; }
     public string Email { get; }
-    public string PasswordHash { get; }
-    public string FullName { get; }
-    public string Role => AdminRole;
+    public string PasswordHash { get; private set; }
+    public string FullName { get; private set; }
+    public string Role { get; private set; }
     public bool IsActive { get; private set; }
     public DateTime CreatedAt { get; }
     public int FailedLoginCount { get; private set; }
@@ -25,7 +34,8 @@ public sealed class AdminUser
         bool isActive,
         DateTime createdAt,
         int failedLoginCount = 0,
-        DateTime? lockoutEndUtc = null)
+        DateTime? lockoutEndUtc = null,
+        string? role = null)
     {
         if (id == Guid.Empty)
         {
@@ -39,20 +49,15 @@ public sealed class AdminUser
             throw new InvalidAdminPasswordException();
         }
 
-        if (fullName is not null && (fullName.EnumerateRunes().Count() > 100 || fullName.Contains('\0')))
-        {
-            throw new InvalidAdminFullNameException();
-        }
-
-        var trimmedName = fullName?.Trim() ?? string.Empty;
-        if (trimmedName.EnumerateRunes().Count() > 100 || trimmedName.Contains('\0'))
-        {
-            throw new InvalidAdminFullNameException();
-        }
+        var trimmedName = ValidateAndTrimFullName(fullName);
+        var normalizedRole = string.IsNullOrWhiteSpace(role)
+            ? AdminRole
+            : NormalizeAndValidateRole(role);
 
         Id = id;
         PasswordHash = passwordHash;
         FullName = trimmedName;
+        Role = normalizedRole;
         IsActive = isActive;
         CreatedAt = createdAt;
         FailedLoginCount = Math.Max(0, failedLoginCount);
@@ -86,6 +91,80 @@ public sealed class AdminUser
     {
         FailedLoginCount = 0;
         LockoutEndUtc = null;
+    }
+
+    public void ChangePasswordHash(string newPasswordHash)
+    {
+        if (string.IsNullOrWhiteSpace(newPasswordHash))
+        {
+            throw new InvalidAdminPasswordException();
+        }
+
+        PasswordHash = newPasswordHash;
+        ResetFailedLogins();
+    }
+
+    public void UpdateProfileAndAccess(string? role, bool? isActive, string? fullName)
+    {
+        if (role is not null)
+        {
+            Role = NormalizeAndValidateRole(role);
+        }
+
+        if (isActive.HasValue)
+        {
+            IsActive = isActive.Value;
+        }
+
+        if (fullName is not null)
+        {
+            FullName = ValidateAndTrimFullName(fullName);
+        }
+    }
+
+    public static bool IsValidWorkforceRole(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+        {
+            return false;
+        }
+
+        var candidate = role.Trim();
+        return string.Equals(candidate, AdminRole, StringComparison.Ordinal) ||
+               string.Equals(candidate, SupportRole, StringComparison.Ordinal) ||
+               string.Equals(candidate, AuditorRole, StringComparison.Ordinal);
+    }
+
+    public static string NormalizeAndValidateRole(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+        {
+            throw new InvalidAdminRoleException(role);
+        }
+
+        var normalized = role.Trim().ToLowerInvariant();
+        if (normalized is not (AdminRole or SupportRole or AuditorRole))
+        {
+            throw new InvalidAdminRoleException(role);
+        }
+
+        return normalized;
+    }
+
+    private static string ValidateAndTrimFullName(string? fullName)
+    {
+        if (fullName is not null && (fullName.EnumerateRunes().Count() > 100 || fullName.Contains('\0')))
+        {
+            throw new InvalidAdminFullNameException();
+        }
+
+        var trimmedName = fullName?.Trim() ?? string.Empty;
+        if (trimmedName.EnumerateRunes().Count() > 100 || trimmedName.Contains('\0'))
+        {
+            throw new InvalidAdminFullNameException();
+        }
+
+        return trimmedName;
     }
 
     private static readonly System.Text.RegularExpressions.Regex StrictEmailRegex = new(

@@ -14,6 +14,9 @@ public static class AdminIdentitySecurityMetrics
     private static readonly Counter<long> TokenRevokedCounter =
         AuditMeter.CreateCounter<long>("davids.security.token_revoked", unit: "{token}");
 
+    private static readonly Counter<long> ChangeAuditCounter =
+        AuditMeter.CreateCounter<long>("davids.security.change_audit", unit: "{event}");
+
     public static void RecordLoginAudit(string? outcome, bool succeeded)
     {
         LoginAuditCounter.Add(
@@ -29,5 +32,14 @@ public static class AdminIdentitySecurityMetrics
             1,
             new KeyValuePair<string, object?>("domain", "admin"),
             new KeyValuePair<string, object?>("source", source ?? "unknown"));
+    }
+
+    public static void RecordChangeAudit(string? action)
+    {
+        ChangeAuditCounter.Add(
+            1,
+            new KeyValuePair<string, object?>("service", "admin-identity"),
+            new KeyValuePair<string, object?>("action", action ?? "unknown"),
+            new KeyValuePair<string, object?>("actor_authority", "employee"));
     }
 }

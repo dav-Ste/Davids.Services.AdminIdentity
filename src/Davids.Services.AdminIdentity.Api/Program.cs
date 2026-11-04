@@ -198,6 +198,11 @@ static AdminActorMetadata? TryResolveActor(ClaimsPrincipal principal, HttpContex
 
 app.MapGet("/me", async (HttpContext httpContext, ClaimsPrincipal principal, IAdminIdentityService service, CancellationToken ct) =>
 {
+    if (httpContext.Request.QueryString.HasValue)
+    {
+        return Results.BadRequest(new { code = "unexpected_query_parameters", reason = "Workforce profile endpoint does not accept query parameters." });
+    }
+
     if (!Guid.TryParse(principal.FindFirstValue("sub"), out var adminId))
     {
         return Results.Unauthorized();
@@ -214,6 +219,7 @@ app.MapGet("/me", async (HttpContext httpContext, ClaimsPrincipal principal, IAd
     }
 })
 .Produces<AdminUserDto>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
 .Produces(StatusCodes.Status404NotFound)
 .RequireAuthorization("WorkforceAny");
 
@@ -274,6 +280,11 @@ app.MapGet("/login-audits", async (
     if (limit is < 1 or > 500)
     {
         return Results.BadRequest(new { code = "invalid_limit", reason = "Limit must be between 1 and 500." });
+    }
+
+    if (email is not null && (email.Length > 254 || email.Contains('\0')))
+    {
+        return Results.BadRequest(new { code = "invalid_email_filter", reason = "Email filter is invalid." });
     }
 
     try
@@ -358,6 +369,11 @@ app.MapPut("/users/{userId:guid}", async (
     IAdminIdentityService service,
     CancellationToken ct) =>
 {
+    if (httpContext.Request.QueryString.HasValue)
+    {
+        return Results.BadRequest(new { code = "unexpected_query_parameters", reason = "Workforce user update endpoint does not accept query parameters." });
+    }
+
     if (command is null)
     {
         return Results.BadRequest(new { code = "invalid_request", reason = "Request body is required." });
@@ -392,6 +408,11 @@ app.MapPost("/users/{userId:guid}/unlock", async (
     IAdminIdentityService service,
     CancellationToken ct) =>
 {
+    if (httpContext.Request.QueryString.HasValue)
+    {
+        return Results.BadRequest(new { code = "unexpected_query_parameters", reason = "Workforce unlock endpoint does not accept query parameters." });
+    }
+
     var actor = TryResolveActor(principal, httpContext);
     if (actor is null)
     {
@@ -409,6 +430,7 @@ app.MapPost("/users/{userId:guid}/unlock", async (
     }
 })
 .Produces<AdminUserDto>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
 .Produces(StatusCodes.Status404NotFound)
 .RequireAuthorization("AdminOnly");
 

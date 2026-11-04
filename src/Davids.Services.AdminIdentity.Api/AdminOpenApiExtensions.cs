@@ -28,34 +28,92 @@ public static class AdminOpenApiExtensions
                     Description = "RS256 OIDC administrator access token (aud: davids-admin, role: admin)."
                 };
 
-                if (document.Components.Schemas is not null &&
-                    document.Components.Schemas.TryGetValue("CreateAdminUser", out var createRef) &&
-                    createRef is OpenApiSchema createSchema &&
-                    createSchema.Properties is not null)
+                const string NonWhitespaceNoNullPattern = @"^[^\u0000]*\S[^\u0000]*$";
+                JsonNode?[] WorkforceRoleEnum() =>
+                [
+                    null,
+                    JsonValue.Create("admin"),
+                    JsonValue.Create("support"),
+                    JsonValue.Create("auditor")
+                ];
+
+                if (document.Components.Schemas is not null)
                 {
-                    createSchema.Required = new HashSet<string>(StringComparer.Ordinal) { "email", "password" };
-
-                    if (createSchema.Properties.TryGetValue("email", out var emailProp) && emailProp is OpenApiSchema emailSchema)
+                    if (document.Components.Schemas.TryGetValue("CreateAdminUser", out var createRef) &&
+                        createRef is OpenApiSchema createSchema &&
+                        createSchema.Properties is not null)
                     {
-                        emailSchema.Type = JsonSchemaType.String;
-                        emailSchema.MinLength = 6;
-                        emailSchema.MaxLength = 254;
-                        emailSchema.Pattern = @"^[A-Za-z0-9_%+\-]{1,20}(?:\.[A-Za-z0-9_%+\-]{1,20}){0,2}@(?:[A-Za-z0-9](?:[A-Za-z0-9\-]{0,30}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$";
+                        createSchema.Required = new HashSet<string>(StringComparer.Ordinal) { "email", "password" };
+
+                        if (createSchema.Properties.TryGetValue("email", out var emailProp) && emailProp is OpenApiSchema emailSchema)
+                        {
+                            emailSchema.Type = JsonSchemaType.String;
+                            emailSchema.MinLength = 6;
+                            emailSchema.MaxLength = 254;
+                            emailSchema.Pattern = @"^[A-Za-z0-9_%+\-]{1,20}(?:\.[A-Za-z0-9_%+\-]{1,20}){0,2}@(?:[A-Za-z0-9](?:[A-Za-z0-9\-]{0,30}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$";
+                        }
+
+                        if (createSchema.Properties.TryGetValue("password", out var pwdProp) && pwdProp is OpenApiSchema pwdSchema)
+                        {
+                            pwdSchema.Type = JsonSchemaType.String;
+                            pwdSchema.MinLength = 12;
+                            pwdSchema.MaxLength = 128;
+                            pwdSchema.Pattern = NonWhitespaceNoNullPattern;
+                        }
+
+                        if (createSchema.Properties.TryGetValue("fullName", out var nameProp) && nameProp is OpenApiSchema nameSchema)
+                        {
+                            nameSchema.Type = JsonSchemaType.String | JsonSchemaType.Null;
+                            nameSchema.MaxLength = 100;
+                            nameSchema.Pattern = @"^[^\u0000]*$";
+                        }
+
+                        if (createSchema.Properties.TryGetValue("role", out var roleProp) && roleProp is OpenApiSchema roleSchema)
+                        {
+                            roleSchema.Type = JsonSchemaType.String | JsonSchemaType.Null;
+                            roleSchema.Enum = WorkforceRoleEnum()!;
+                        }
                     }
 
-                    if (createSchema.Properties.TryGetValue("password", out var pwdProp) && pwdProp is OpenApiSchema pwdSchema)
+                    if (document.Components.Schemas.TryGetValue("UpdateAdminUser", out var updateRef) &&
+                        updateRef is OpenApiSchema updateSchema &&
+                        updateSchema.Properties is not null)
                     {
-                        pwdSchema.Type = JsonSchemaType.String;
-                        pwdSchema.MinLength = 12;
-                        pwdSchema.MaxLength = 128;
-                        pwdSchema.Pattern = @"^[^\u0000]*\S[^\u0000]*$";
+                        if (updateSchema.Properties.TryGetValue("role", out var roleProp) && roleProp is OpenApiSchema roleSchema)
+                        {
+                            roleSchema.Type = JsonSchemaType.String | JsonSchemaType.Null;
+                            roleSchema.Enum = WorkforceRoleEnum()!;
+                        }
+
+                        if (updateSchema.Properties.TryGetValue("fullName", out var nameProp) && nameProp is OpenApiSchema nameSchema)
+                        {
+                            nameSchema.Type = JsonSchemaType.String | JsonSchemaType.Null;
+                            nameSchema.MaxLength = 100;
+                            nameSchema.Pattern = @"^[^\u0000]*$";
+                        }
                     }
 
-                    if (createSchema.Properties.TryGetValue("fullName", out var nameProp) && nameProp is OpenApiSchema nameSchema)
+                    if (document.Components.Schemas.TryGetValue("ChangeAdminPassword", out var changePwdRef) &&
+                        changePwdRef is OpenApiSchema changePwdSchema &&
+                        changePwdSchema.Properties is not null)
                     {
-                        nameSchema.Type = JsonSchemaType.String | JsonSchemaType.Null;
-                        nameSchema.MaxLength = 100;
-                        nameSchema.Pattern = @"^[^\u0000]*$";
+                        changePwdSchema.Required = new HashSet<string>(StringComparer.Ordinal) { "currentPassword", "newPassword" };
+
+                        if (changePwdSchema.Properties.TryGetValue("currentPassword", out var curProp) && curProp is OpenApiSchema curSchema)
+                        {
+                            curSchema.Type = JsonSchemaType.String;
+                            curSchema.MinLength = 1;
+                            curSchema.MaxLength = 128;
+                            curSchema.Pattern = NonWhitespaceNoNullPattern;
+                        }
+
+                        if (changePwdSchema.Properties.TryGetValue("newPassword", out var newProp) && newProp is OpenApiSchema newSchema)
+                        {
+                            newSchema.Type = JsonSchemaType.String;
+                            newSchema.MinLength = 12;
+                            newSchema.MaxLength = 128;
+                            newSchema.Pattern = NonWhitespaceNoNullPattern;
+                        }
                     }
                 }
 
@@ -113,6 +171,12 @@ public static class AdminOpenApiExtensions
                                 limitSchema.Type = JsonSchemaType.Integer;
                                 limitSchema.Minimum = "1";
                                 limitSchema.Maximum = "500";
+                            }
+                            else if (string.Equals(parameter.Name, "email", StringComparison.Ordinal) &&
+                                     parameter.Schema is OpenApiSchema emailFilterSchema)
+                            {
+                                emailFilterSchema.MaxLength = 254;
+                                emailFilterSchema.Pattern = @"^[^\u0000]*$";
                             }
                         }
 

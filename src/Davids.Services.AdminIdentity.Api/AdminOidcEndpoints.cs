@@ -315,7 +315,7 @@ public static class AdminOidcEndpoints
         app.MapMethods("/connect/logout", ["GET", "POST"], () =>
             Results.SignOut(
                 authenticationSchemes: [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme],
-                properties: new AuthenticationProperties { RedirectUri = "/login" }))
+                properties: new AuthenticationProperties { RedirectUri = "/admin/login" }))
             .ExcludeFromDescription()
             .AllowAnonymous();
     }

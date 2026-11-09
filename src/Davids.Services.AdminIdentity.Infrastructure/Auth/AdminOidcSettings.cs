@@ -37,11 +37,11 @@ public sealed class AdminOidcSettings
     ];
     public string[] AllowedPostLogoutRedirectUris { get; set; } =
     [
-        "https://localhost/login",
-        "http://localhost:17320/login",
-        "https://localhost:17320/login",
-        "http://localhost:5000/login",
-        "https://localhost:5001/login"
+        "https://localhost/admin/login",
+        "http://localhost:17320/admin/login",
+        "https://localhost:17320/admin/login",
+        "http://localhost:5000/admin/login",
+        "https://localhost:5001/admin/login"
     ];
 
     public RsaSecurityKey PrivateSigningKey { get; private set; } = null!;

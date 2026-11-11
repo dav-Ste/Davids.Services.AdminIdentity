@@ -2,7 +2,7 @@
 
 | Pull Request CI | CodeQL SAST | Platform Architecture & Orchestration |
 |---|---|---|
-| [![Pull Request CI — Security Gate](https://github.com/dav-Ste/Davids.Services.AdminIdentity/actions/workflows/pull-request-ci.yml/badge.svg?branch=main)](https://github.com/dav-Ste/Davids.Services.AdminIdentity/actions/workflows/pull-request-ci.yml) | [![Pull Request CI — CodeQL SAST](https://github.com/dav-Ste/Davids.Services.AdminIdentity/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/dav-Ste/Davids.Services.AdminIdentity/actions/workflows/codeql.yml) | [**`Davids` — Architecture & Security Diagram**](https://github.com/dav-Ste/Davids#architecture-project-relationships--security-posture) |
+| [![CI — Build, Tests & Security](https://github.com/dav-Ste/Davids.Services.AdminIdentity/actions/workflows/pull-request-ci.yml/badge.svg?branch=main)](https://github.com/dav-Ste/Davids.Services.AdminIdentity/actions/workflows/pull-request-ci.yml) | [![CodeQL — PR, Main & Weekly SAST](https://github.com/dav-Ste/Davids.Services.AdminIdentity/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/dav-Ste/Davids.Services.AdminIdentity/actions/workflows/codeql.yml) | [**`Davids` — Architecture & Security Diagram**](https://github.com/dav-Ste/Davids#architecture-project-relationships--security-posture) |
 
 `Davids.Services.AdminIdentity` is the standalone `.NET 10` **Self-Hosted Administrator OpenID Connect (OIDC) Provider** (`OpenIddict` `7.7.2`, default local port `:17325`) and administrator account-provisioning microservice (`Davids.Services.AdminIdentity.slnx`).
 
